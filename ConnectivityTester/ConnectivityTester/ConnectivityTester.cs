@@ -11,7 +11,7 @@ namespace ConnectivityTester
     static class ConnectivityTester
     {
         private const double TimeLimitSeconds = 10.0;
-        private const int NumPings = 5;
+        private static int NumPings = 5;
 
         public static void PrintLocalNetworkConfiguration()
         {
@@ -42,24 +42,14 @@ namespace ConnectivityTester
                 Console.WriteLine($"\t\tInterface type: {networkInterface.NetworkInterfaceType}");
                 Console.WriteLine($"\t\tOperational status: {networkInterface.OperationalStatus}");
 
-
                 Console.WriteLine($"\t\tSupports IPv4: {networkInterface.Supports(System.Net.NetworkInformation.NetworkInterfaceComponent.IPv4)}");
                 Console.WriteLine($"\t\tSupports IPv6: {networkInterface.Supports(System.Net.NetworkInformation.NetworkInterfaceComponent.IPv6)}");
 
-                Console.WriteLine("\t\tUnicast address list:");
-                
-               foreach (var ip in properties.UnicastAddresses)
-                {
-                    Console.WriteLine($"\t\t\t{ip.Address}");
-                }
-               
-                Console.WriteLine("\t\tDNS server address list:");
+                Console.Write("\t\tUnicast address list:\n\t\t\t");
+                Console.WriteLine(String.Join("\n\t\t\t", properties.UnicastAddresses.Select(address => address.Address)));
 
-                foreach (var address in properties.DnsAddresses)
-                {
-                    Console.WriteLine($"\t\t\t{address}");
-                }
-
+                Console.Write("\t\tDNS server address list:\n\t\t\t");
+                Console.WriteLine(String.Join("\n\t\t\t", properties.DnsAddresses));
                 Console.WriteLine();
             }
         }
@@ -72,36 +62,27 @@ namespace ConnectivityTester
             {
                 var entry = Dns.GetHostEntry(host);
 
-                Console.WriteLine($"\t{host} resolved to:");
+                Console.Write($"\t{host} resolved to:\n\t\t");
+                Console.WriteLine(String.Join<IPAddress>("\n\t\t", entry.AddressList));
 
-                foreach (var ip in entry.AddressList)
-                {
-                    Console.WriteLine($"\t\t{ip}");
-                }
-
-                Console.WriteLine($"\t{host} aliases:");
-
-               foreach (var alias in entry.Aliases)
-               {
-                    Console.WriteLine($"\t\t{alias}");
-               }
-               
+                Console.Write($"\t{host} aliases:\n\t\t");
+                Console.WriteLine(String.Join("\n\t\t", entry.Aliases));
                 Console.WriteLine();
 
                 return entry.AddressList;
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
+                Console.WriteLine($"\t{e.Message}");
+                Console.WriteLine();
+
                 return null;
             }
         }
 
         public static IPAddress[] TestSubnetConnectivity(string subnetAddressPrefix, int port, IPAddress[] resolvedAddresses = null)
         {
-            
             string[] split = subnetAddressPrefix.Split('.', '/');
-
             byte[] ip = { byte.Parse(split[0]), byte.Parse(split[1]), byte.Parse(split[2]), byte.Parse(split[3]) };
             byte mask = byte.Parse(split[4]);
 
@@ -111,21 +92,13 @@ namespace ConnectivityTester
 
             if (successfulConnections != null)
             {
-                Console.WriteLine($"\t{successfulConnections.Count} successful TCP connections established...");
-
-                foreach (var ipAddress in successfulConnections)
-                {
-                    Console.Write($"\t\t{ipAddress}");
-                    if (resolvedAddresses != null && resolvedAddresses.Contains(ipAddress))
-                    {
-                        Console.Write(" [Host resolved to this address]");
-                    }
-                    Console.WriteLine();
-                }
+                Console.Write($"\t{successfulConnections.Count} successful TCP connections established...\n\t\t");
+                Console.WriteLine(String.Join("\n\t\t", successfulConnections.Select(ipAddress => (resolvedAddresses != null && resolvedAddresses.Contains(ipAddress)) ? ipAddress.ToString() + " [Host resolved to this address]" : ipAddress.ToString())));
                 Console.WriteLine();
 
                 return successfulConnections.ToArray();
             }
+
             return null;
         }
 
@@ -136,7 +109,6 @@ namespace ConnectivityTester
             {
                 var clients = new LinkedList<TcpClient>();
                 var asyncResults = new Dictionary<TcpClient, IPAddress>();
-
                 var sucConnections = new LinkedList<IPAddress>();
 
                 // Iterating through IP Addresses starting from ip to the last ip address of ip/mask CIDR address range
@@ -147,7 +119,7 @@ namespace ConnectivityTester
 
                     clients.AddLast(client);
                     asyncResults.Add(client, ipAddress);
-                    
+
                     // Initiate TCP 3-Way handshake with ipAddress:port
                     client.BeginConnect(ipAddress, port, null, null);
 
@@ -183,6 +155,7 @@ namespace ConnectivityTester
                     {
                         sucConnections.AddLast(asyncResults[client]);
                     }
+
                     client.Close();
                 }
 
@@ -256,15 +229,15 @@ namespace ConnectivityTester
 
         public static void Main(String[] args)
         {
-            if (args.Length != 2)
+            if (args.Length != 2 && args.Length != 4 || (args.Length == 4 && (args[2] != "-NumPings" || !int.TryParse(args[3], out NumPings))))
             {
-                Console.WriteLine("Usage: ConnectivityTester.exe <miSubnetRange> <miHostname>");
+                Console.WriteLine("Usage: ConnectivityTester.exe <miSubnetRange> <miHostname> [-NumPings <num>]");
                 Environment.Exit(-1);
             }
             else if (!Regex.IsMatch(args[0], @"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}\b"))
             {
                 Console.WriteLine("Invalid IP address range format!");
-                Console.WriteLine("Usage: ConnectivityTester.exe <miSubnetRange> <miHostname>");
+                Console.WriteLine("Usage: ConnectivityTester.exe <miSubnetRange> <miHostname> [-NumPings <num>]");
                 Environment.Exit(-2);
             }
 
@@ -274,13 +247,15 @@ namespace ConnectivityTester
                 IPAddress[] resolvedAddresses = PrintResolveHost(args[1]);
                 IPAddress[] successfulConnections = TestSubnetConnectivity(args[0], 1433, resolvedAddresses);
                 MeasureAverageResponseTimeForSuccessfulConnections(successfulConnections, 1433);
-                PingTCP(args[1], 3342);
-            } catch (Exception e)
+                if (resolvedAddresses != null)
+                {
+                    PingTCP(args[1], 3342);
+                }
+            }
+            catch (Exception e)
             {
                 Console.WriteLine(e.Message);
             }
         }
     }
 }
-
-
