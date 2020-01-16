@@ -232,7 +232,7 @@ namespace ConnectivityTester
 
         public static void Main(String[] args)
         {
-            if (args.Length != 2 && args.Length != 4 || (args.Length == 4 && (args[2] != "-NumPings" || !int.TryParse(args[3], out NumPings))))
+            if (args.Length != 2 && args.Length != 4 || (args.Length == 4 && (args[2] != "-NumPings" || (!int.TryParse(args[3], out NumPings) || NumPings <= 0))))
             {
                 Console.WriteLine("Usage: ConnectivityTester.exe <miSubnetRange> <miHostname> [-NumPings <num>]");
                 Environment.Exit(-1);
