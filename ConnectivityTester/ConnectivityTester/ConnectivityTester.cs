@@ -114,37 +114,44 @@ namespace ConnectivityTester
                 var asyncResults = new Dictionary<TcpClient, IPAddress>();
                 var sucConnections = new LinkedList<IPAddress>();
 
-                // Iterating through IP Addresses starting from ip to the last ip address of ip/mask CIDR address range
-                for (int i = 0; i < (int)Math.Pow(2, 32 - mask); i++)
+                var totalAddresses = (int)Math.Pow(2, 32 - mask);
+
+                // Iterating through IP Addresses starting from ip to the last ip address of ip/mask CIDR address range in batches of 256 addresses
+                for (int batch = 0; batch < totalAddresses; batch += 256)
                 {
-                    var client = new TcpClient();
-                    var ipAddress = new IPAddress(ip);
+                    var curBatchSize = (((totalAddresses - batch) / 256) == 0 ? totalAddresses - batch : 256);
+                    
+                    for (int i = 0; i < curBatchSize; i++)
+                    {
+                        var client = new TcpClient();
+                        var ipAddress = new IPAddress(ip);
 
-                    clients.AddLast(client);
-                    asyncResults.Add(client, ipAddress);
+                        clients.AddLast(client);
+                        asyncResults.Add(client, ipAddress);
 
-                    // Initiate TCP 3-Way handshake with ipAddress:port
-                    client.BeginConnect(ipAddress, port, null, null);
+                        // Initiate TCP 3-Way handshake with ipAddress:port
+                        client.BeginConnect(ipAddress, port, null, null);
 
-                    // Calculating the next IP address in the given range
-                    if ((i + 1) % 16777216 == 0)
-                    {
-                        ip[0]++;
-                        ip[1] = ip[2] = ip[3] = 0;
-                    }
-                    else if ((i + 1) % 65536 == 0)
-                    {
-                        ip[1]++;
-                        ip[2] = ip[3] = 0;
-                    }
-                    else if ((i + 1) % 256 == 0)
-                    {
-                        ip[2]++;
-                        ip[3] = 0;
-                    }
-                    else
-                    {
-                        ip[3]++;
+                        // Calculating the next IP address in the given range
+                        if ((i + 1) % 16777216 == 0)
+                        {
+                            ip[0]++;
+                            ip[1] = ip[2] = ip[3] = 0;
+                        }
+                        else if ((i + 1) % 65536 == 0)
+                        {
+                            ip[1]++;
+                            ip[2] = ip[3] = 0;
+                        }
+                        else if ((i + 1) % 256 == 0)
+                        {
+                            ip[2]++;
+                            ip[3] = 0;
+                        }
+                        else
+                        {
+                            ip[3]++;
+                        }
                     }
                 }
 
